@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -e
+
+# For the check step concourse will set the following environment variables:
+# SOURCE_PATH - path to component repository root directory.
+
+if [[ -z "${SOURCE_PATH}" ]]; then
+  export SOURCE_PATH="$(readlink -f "$(dirname ${0})/..")"
+else
+  export SOURCE_PATH="$(readlink -f ${SOURCE_PATH})"
+fi
+
+# Install Golint.
+if ! which golint 1>/dev/null; then
+  echo -n "Installing golint... "
+  go get -u golang.org/x/lint/golint
+  echo "done."
+fi
+
+cd $SOURCE_PATH
+# Execute static code checks.
+go vet ./cmd/...
+go vet ./pkg/...
+
+cd -
+
+if [ -n "$(gofmt -l $SOURCE_PATH)" ]; then
+  echo "Formatting errors:"
+  gofmt -l $SOURCE_PATH
+  exit 1
+fi
+
+# Execute lint checks
+golint -set_exit_status $SOURCE_PATH
