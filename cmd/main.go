@@ -30,6 +30,8 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
+
+	_ "github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/cloudprovider/vspherek8s"
 )
 
 func main() {

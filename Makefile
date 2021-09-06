@@ -24,20 +24,20 @@ start:
 
 .PHONY: build
 build:
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor \
 		-o $(WORKDIR)/bin/cloud-controller-manager-vsphere-with-k8s \
 		-ldflags $(LDFLAGS) \
 		$(WORKDIR)/cmd/main.go
 
 .PHONY: build-local
 build-local:
-	@go build \
+	@go build -mod=vendor\
 		-o $(WORKDIR)/bin/cloud-controller-manager-vsphere-with-k8s \
 		-ldflags $(LDFLAGS) \
 		$(WORKDIR)/cmd/main.go
 
 .PHONY: docker-build
-docker-build:
+docker-images:
 	@docker build \
 		-t $(IMAGE_REPOSITORY):$(IMAGE_VERSION) \
 		-t $(IMAGE_REPOSITORY):latest \

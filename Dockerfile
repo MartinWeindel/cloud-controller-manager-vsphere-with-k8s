@@ -1,22 +1,16 @@
 #####################      builder       #####################
-FROM golang:1.16 AS builder
+FROM eu.gcr.io/gardener-project/3rd/golang:1.16.7 AS builder
 
-WORKDIR /go/src/github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s
+WORKDIR /build
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-  -o /go/bin/cloud-controller-manager-vsphere-with-k8s \
-  -ldflags="-s -w \
-    -X github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/version.gitVersion=$(cat VERSION) \
-    -X github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/version.gitCommit=$(git rev-parse --verify HEAD) \
-    -X github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/version.buildDate=$(date --rfc-3339=seconds | sed 's/ /T/')" \
-  cmd/main.go
+RUN make build
 
 #############      cloud-controller-manager-vsphere-with-k8s     #############
-FROM alpine:3.12 AS cloud-controller-manager
+FROM eu.gcr.io/gardener-project/3rd/alpine:3.13.5 AS cloud-controller-manager
 
-COPY --from=builder /go/bin/cloud-controller-manager-vsphere-with-k8s /cloud-controller-manager-vsphere-with-k8s
+COPY --from=builder /build/bin/cloud-controller-manager-vsphere-with-k8s /bin/vspherewk8s-cloud-controller-manager
 
 WORKDIR /
 
-ENTRYPOINT ["/cloud-controller-manager-vsphere-with-k8s"]
+ENTRYPOINT ["/bin/vspherewk8s-cloud-controller-manager"]
