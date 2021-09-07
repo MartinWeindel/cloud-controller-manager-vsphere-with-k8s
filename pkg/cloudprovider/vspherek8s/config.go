@@ -18,10 +18,6 @@
 package vspherek8s
 
 import (
-	"fmt"
-	"io"
-	"io/ioutil"
-
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -38,14 +34,9 @@ type supervisor struct {
 	Insecure      bool   `json:"insecure"`
 }
 
-func readConfig(input io.Reader) (*config, error) {
-	data, err := ioutil.ReadAll(input)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read cloud configuration from %q [%v]", input, err)
-	}
-
+func readConfig(byConfig []byte) (*config, error) {
 	cfg := &config{}
-	err = yaml.Unmarshal(data, &cfg)
+	err := yaml.Unmarshal(byConfig, &cfg)
 	if err != nil {
 		return nil, err
 	}

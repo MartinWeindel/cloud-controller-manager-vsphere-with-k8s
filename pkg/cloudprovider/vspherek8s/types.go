@@ -17,6 +17,10 @@ limitations under the License.
 package vspherek8s
 
 import (
+	"github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/cloudprovider/vspherek8s/loadbalancer"
+	lcfg "github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/cloudprovider/vspherek8s/loadbalancer/config"
+	"github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/nsxt"
+	ncfg "github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/nsxt/config"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -26,4 +30,9 @@ type VSphereWithK8s struct {
 	config
 	client    clientset.Interface
 	instances cloudprovider.InstancesV2
+
+	nsxtconfig       *ncfg.NsxtConfig
+	lbconfig         *lcfg.LBConfig
+	loadbalancer     loadbalancer.LBProvider
+	nsxtConnectorMgr *nsxt.ConnectorManager
 }

@@ -20,11 +20,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 
+	"github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/cloudprovider/vspherek8s/loadbalancer"
+	"github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/nsxt"
 	"k8s.io/client-go/rest"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
-	cloudprovider "k8s.io/cloud-provider"
+	lcfg "github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/cloudprovider/vspherek8s/loadbalancer/config"
+	ncfg "github.com/martinweindel/cloud-controller-manager-vsphere-with-k8s/pkg/nsxt/config"
 )
 
 const (
@@ -44,23 +49,60 @@ func init() {
 			return nil, fmt.Errorf("no vsphere-with-k8s cloud provider config file given")
 		}
 
-		cfg, err := readConfig(config)
+		byConfig, err := ioutil.ReadAll(config)
+		if err != nil {
+			klog.Errorf("ReadAll failed: %s", err)
+			return nil, err
+		}
+
+		cfg, err := readConfig(byConfig)
 		if err != nil {
 			// we got an error where the decode wasn't related to a missing type
 			return nil, err
 		}
 
-		return newVSphereWithK8s(cfg)
+		nsxtcfg, err := ncfg.ReadNsxtConfig(byConfig)
+		if err != nil {
+			klog.Errorf("ReadNsxtConfig failed: %s", err)
+			nsxtcfg = nil
+		}
+		lbcfg, err := lcfg.ReadLBConfig(byConfig)
+		if err != nil {
+			klog.Errorf("ReadLBConfig failed: %s", err)
+			lbcfg = nil
+		}
+		return newVSphereWithK8s(cfg, nsxtcfg, lbcfg)
 	})
 }
 
 // Creates new Controller node interface and returns
-func newVSphereWithK8s(cfg *config) (*VSphereWithK8s, error) {
+func newVSphereWithK8s(cfg *config, nsxtcfg *ncfg.NsxtConfig, lbcfg *lcfg.LBConfig) (*VSphereWithK8s, error) {
 	cp := &VSphereWithK8s{
-		config: *cfg,
+		config:     *cfg,
+		nsxtconfig: nsxtcfg,
+		lbconfig:   lbcfg,
+	}
+
+	if cp.isLoadBalancerSupportEnabled() {
+		ncm, err := nsxt.NewConnectorManager(nsxtcfg)
+		if err != nil {
+			return nil, err
+		}
+
+		lb, err := loadbalancer.NewLBProvider(lbcfg, ncm.GetConnector())
+		if err != nil {
+			return nil, err
+		}
+
+		cp.nsxtConnectorMgr = ncm
+		cp.loadbalancer = lb
 	}
 
 	return cp, nil
+}
+
+func (cp *VSphereWithK8s) isLoadBalancerSupportEnabled() bool {
+	return cp.lbconfig != nil && cp.nsxtconfig != nil && cp.lbconfig.LoadBalancer.Enabled
 }
 
 // Initialize initializes the vSphere with k8s cloud provider.
@@ -85,13 +127,24 @@ func (cp *VSphereWithK8s) Initialize(clientBuilder cloudprovider.ControllerClien
 	}
 	cp.instances = instances
 
+	if cp.isLoadBalancerSupportEnabled() {
+		klog.Info("initializing load balancer support")
+		if loadbalancer.ClusterName == "" {
+			klog.Warning("Missing cluster id, no periodical cleanup possible")
+		}
+		cp.loadbalancer.Initialize(loadbalancer.ClusterName, client, stop)
+	}
+
 	klog.V(0).Info("Initializing vSphere with Kubernetes Cloud Provider Succeeded")
 }
 
 // LoadBalancer returns a balancer interface. Also returns true if the
 // interface is supported, false otherwise.
 func (cp *VSphereWithK8s) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	klog.V(1).Info("The vSphere with Kubernetes cloud provider does not support load balances")
+	if cp.isLoadBalancerSupportEnabled() {
+		return cp.loadbalancer, true
+	}
+	klog.V(1).Info("The vSphere with Kubernetes cloud provider has been configured without load balances")
 	return nil, false
 }
 
